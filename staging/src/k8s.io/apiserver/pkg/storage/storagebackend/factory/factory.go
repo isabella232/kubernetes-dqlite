@@ -19,6 +19,7 @@ package factory
 import (
 	"fmt"
 
+	kvsql "github.com/freeekanayaka/kvsql"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -34,6 +35,8 @@ func Create(c storagebackend.Config, newFunc func() runtime.Object) (storage.Int
 		return nil, nil, fmt.Errorf("%v is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
 		return newETCD3Storage(c, newFunc)
+	case storagebackend.StorageTypeDqlite:
+		return kvsql.NewKVSQLStorage(c)
 	default:
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
@@ -46,6 +49,8 @@ func CreateHealthCheck(c storagebackend.Config) (func() error, error) {
 		return nil, fmt.Errorf("%v is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
 		return newETCD3HealthCheck(c)
+	case storagebackend.StorageTypeDqlite:
+		return kvsql.NewKVSQLHealthCheck(c)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
