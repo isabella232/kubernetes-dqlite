@@ -33,6 +33,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/spf13/cobra"
 
+	kvsqlfactory "github.com/freeekanayaka/kvsql"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -147,6 +148,10 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
+	if completeOptions.Etcd.StorageConfig.Type == storagebackend.StorageTypeDqlite {
+		defer kvsqlfactory.Close()
+	}
+
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
