@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -34,6 +35,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kvsqlfactory "github.com/freeekanayaka/kvsql"
+	kvsqlserver "github.com/freeekanayaka/kvsql/server"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -149,7 +151,12 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	if completeOptions.Etcd.StorageConfig.Type == storagebackend.StorageTypeDqlite {
-		defer kvsqlfactory.Close()
+		config := completeOptions.Etcd.StorageConfig
+		server, err := kvsqlserver.New(config.Dir, false)
+		if err != nil {
+			return err
+		}
+		defer server.Close(context.Background())
 	}
 
 	// To help debugging, immediately log version
