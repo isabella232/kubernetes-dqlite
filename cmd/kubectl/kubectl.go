@@ -35,6 +35,7 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	os.Args = append(os.Args, "-v=9")
 	command := cmd.NewDefaultKubectlCommand()
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
