@@ -339,32 +339,10 @@ func (l *LogStructured) Watch(ctx context.Context, prefix string, revision int64
 			result <- kvs
 		}
 
-		for {
-			select {
-			case i, ok := <-readChan:
-				if !ok {
-					goto done
-				}
-				result <- filter(i, lastRevision)
-				continue
-			case <-time.After(time.Minute):
-				logrus.Infof("Inactive watcher %s for revision %d", prefix, revision)
-				_, kvs, err := l.log.After(ctx, prefix, lastRevision, 0)
-				if err != nil {
-					logrus.Errorf("failed to refresh watch %s for revision %d: %v", prefix, revision, err)
-					cancel()
-					continue
-				}
-				result <- filter(kvs, lastRevision)
-				continue
-			}
-		}
-
-	done:
 		// always ensure we fully read the channel
-		//for i := range readChan {
-		//result <- filter(i, lastRevision)
-		//}
+		for i := range readChan {
+			result <- filter(i, lastRevision)
+		}
 		close(result)
 		cancel()
 	}()
