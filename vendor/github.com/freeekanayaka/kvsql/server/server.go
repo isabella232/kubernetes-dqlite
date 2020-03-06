@@ -309,8 +309,6 @@ func initServer(ctx context.Context, cfg *config.Config, db *db.DB, membership *
 // using the target server's /dqlite HTTP endpoint.
 func dqliteDialFunc(cert *transport.Cert) client.DialFunc {
 	return func(ctx context.Context, addr string) (net.Conn, error) {
-		logrus.Infof("dqlite[INFO]: connecting to %s", addr)
-
 		request := &http.Request{
 			Method:     "POST",
 			Proto:      "HTTP/1.1",
@@ -463,5 +461,15 @@ func (s *Server) Close(ctx context.Context) error {
 }
 
 func dqliteLogFunc(l client.LogLevel, format string, a ...interface{}) {
-	logrus.Infof("dqlite[%s]: %s", l, fmt.Sprintf(format, a...))
+	msg := fmt.Sprintf("dqlite: "+format, a...)
+	switch l {
+	case client.LogDebug:
+		logrus.Debug(msg)
+	case client.LogInfo:
+		logrus.Info(msg)
+	case client.LogWarn:
+		logrus.Warn(msg)
+	case client.LogError:
+		logrus.Error(msg)
+	}
 }

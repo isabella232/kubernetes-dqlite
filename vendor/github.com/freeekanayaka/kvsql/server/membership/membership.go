@@ -2,10 +2,12 @@ package membership
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/canonical/go-dqlite/client"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // Membership manages dqlite cluster membership.
@@ -226,5 +228,19 @@ func (m *Membership) Shutdown() {
 func (m *Membership) getLeader() (*client.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	return client.FindLeader(ctx, m.store, client.WithDialFunc(m.dial))
+	return client.FindLeader(ctx, m.store, client.WithDialFunc(m.dial), client.WithLogFunc(dqliteLogFunc))
+}
+
+func dqliteLogFunc(l client.LogLevel, format string, a ...interface{}) {
+	msg := fmt.Sprintf("dqlite: "+format, a...)
+	switch l {
+	case client.LogDebug:
+		logrus.Debug(msg)
+	case client.LogInfo:
+		logrus.Info(msg)
+	case client.LogWarn:
+		logrus.Warn(msg)
+	case client.LogError:
+		logrus.Error(msg)
+	}
 }

@@ -6,7 +6,6 @@ import (
 
 	"github.com/freeekanayaka/kvsql/transport"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func dqliteHandleFunc(localNodeAddress string) http.HandlerFunc {
@@ -42,7 +41,6 @@ func dqliteHandleFunc(localNodeAddress string) http.HandlerFunc {
 			panic("dqlite node is not listening to the given Unix socket")
 		}
 
-		logrus.Infof("dqlite[INFO]: connected via HTTPS, start proxing")
 		transport.Proxy(tlsConn, unixConn)
 	}
 }
