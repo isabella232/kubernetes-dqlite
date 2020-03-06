@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	kvsql "github.com/freeekanayaka/kvsql"
+	"github.com/freeekanayaka/kvsql/server"
 	"github.com/freeekanayaka/kvsql/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +21,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 )
 
 func TestCreate_First(t *testing.T) {
@@ -56,6 +57,30 @@ func TestCreate_Existing(t *testing.T) {
 	}
 }
 
+func TestCreate_Concurrent(t *testing.T) {
+	store, cleanup := newStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	errors := make(chan error, 0)
+
+	go func() {
+		out := &example.Pod{}
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
+		errors <- store.Create(ctx, "foo", obj, out, uint64(0))
+	}()
+
+	go func() {
+		out := &example.Pod{}
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", SelfLink: "testlink"}}
+		errors <- store.Create(ctx, "bar", obj, out, uint64(0))
+	}()
+
+	require.NoError(t, <-errors)
+	require.NoError(t, <-errors)
+}
+
 func TestCreateAgainAfterDeletion(t *testing.T) {
 	store, cleanup := newStore(t)
 	defer cleanup()
@@ -66,7 +91,7 @@ func TestCreateAgainAfterDeletion(t *testing.T) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
 	require.NoError(t, store.Create(ctx, "foo", obj, out, uint64(0)))
 
-	err := store.Delete(ctx, "/foo", obj, nil, nil)
+	err := store.Delete(ctx, "/foo", obj, nil, func(context.Context, runtime.Object) error { return nil })
 	require.NoError(t, err)
 
 	obj = &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
@@ -86,19 +111,23 @@ func newStore(t testing.TB) (storage.Interface, func()) {
 	init := &config.Init{Address: "localhost:9991"}
 	dir, dirCleanup := newDirWithInit(t, init)
 
+	server, err := server.New(dir, false)
+	require.NoError(t, err)
+
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 
 	config := storagebackend.Config{
 		Codec: codec,
 		Dir:   dir,
+		Type:  storagebackend.StorageTypeDqlite,
 	}
 
-	store, destroy, err := kvsql.NewKVSQLStorage(config)
+	store, destroy, err := factory.Create(config)
 	require.NoError(t, err)
 
 	cleanup := func() {
 		destroy()
-		kvsql.Close()
+		server.Close(context.Background())
 		dirCleanup()
 	}
 
