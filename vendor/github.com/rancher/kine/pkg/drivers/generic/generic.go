@@ -133,6 +133,8 @@ func openAndTest(driverName, dataSourceName string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(5)
 
 	for i := 0; i < 3; i++ {
 		if err := db.Ping(); err != nil {
