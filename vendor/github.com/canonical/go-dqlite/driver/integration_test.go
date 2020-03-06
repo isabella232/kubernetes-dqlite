@@ -80,7 +80,7 @@ CREATE TABLE test2 (n INT, t DATETIME DEFAULT CURRENT_TIMESTAMP)
 	require.NoError(t, tx.Rollback())
 }
 
-func TestIntegration_Error(t *testing.T) {
+func TestIntegration_ConstraintError(t *testing.T) {
 	db, _, cleanup := newDB(t, 3)
 	defer cleanup()
 
@@ -97,6 +97,33 @@ func TestIntegration_Error(t *testing.T) {
 	} else {
 		t.Fatalf("expected diver error, got %+v", err)
 	}
+}
+
+func TestIntegration_ExecBindError(t *testing.T) {
+	db, _, cleanup := newDB(t, 1)
+	defer cleanup()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Millisecond)
+	defer cancel()
+
+	_, err := db.ExecContext(ctx, "CREATE TABLE test (n INT)")
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(ctx, "INSERT INTO test(n) VALUES(1)", 1)
+	assert.EqualError(t, err, "column index out of range")
+}
+
+func TestIntegration_QueryBindError(t *testing.T) {
+	db, _, cleanup := newDB(t, 1)
+	defer cleanup()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Millisecond)
+	defer cancel()
+
+	_, err := db.QueryContext(ctx, "SELECT 1", 1)
+	assert.EqualError(t, err, "column index out of range")
 }
 
 func TestIntegration_ConfigMultiThread(t *testing.T) {
@@ -226,7 +253,29 @@ func TestIntegration_HighAvailability(t *testing.T) {
 	helpers[1].Start()
 	helpers[2].Start()
 
+	// Give the cluster a chance to establish a quorom
+	time.Sleep(2 * time.Second)
+
 	_, err = db.Exec("INSERT INTO test(n) VALUES(1)")
+	require.NoError(t, err)
+}
+
+func TestOptions(t *testing.T) {
+	// make sure applying all options doesn't break anything
+	store, err := client.DefaultNodeStore(":memory:")
+	require.NoError(t, err)
+	log := logging.Test(t)
+	_, err = driver.New(
+		store,
+		driver.WithLogFunc(log),
+		driver.WithContext(context.Background()),
+		driver.WithConnectionTimeout(15*time.Second),
+		driver.WithContextTimeout(2*time.Second),
+		driver.WithConnectionBackoffFactor(50*time.Millisecond),
+		driver.WithConnectionBackoffCap(1*time.Second),
+		driver.WithAttemptTimeout(5*time.Second),
+		driver.WithRetryLimit(0),
+	)
 	require.NoError(t, err)
 }
 
@@ -245,6 +294,7 @@ func newDB(t *testing.T, n int) (*sql.DB, []*nodeHelper, func()) {
 	require.NoError(t, store.Set(context.Background(), infos))
 
 	log := logging.Test(t)
+
 	driver, err := driver.New(store, driver.WithLogFunc(log))
 	require.NoError(t, err)
 
