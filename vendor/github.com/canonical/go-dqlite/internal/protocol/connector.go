@@ -61,7 +61,7 @@ func (c *Connector) Connect(ctx context.Context) (*Protocol, error) {
 		var err error
 		protocol, err = c.connectAttemptAll(ctx, log)
 		if err != nil {
-			log(logging.Debug, "connection failed err=%v", err)
+			log(logging.Error, "connection failed err=%v", err)
 			return err
 		}
 
@@ -112,7 +112,7 @@ func (c *Connector) connectAttemptAll(ctx context.Context, log logging.Func) (*P
 		}
 		if protocol != nil {
 			// We found the leader
-			log(logging.Info, "connected")
+			log(logging.Debug, "connected")
 			return protocol, nil
 		}
 		if leader == "" {
